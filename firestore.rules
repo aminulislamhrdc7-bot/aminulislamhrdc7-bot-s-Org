@@ -1,0 +1,392 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny all reads and writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'aminulislam.hrdc7@gmail.com' && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidCurrency(currency) {
+      return currency is string && currency in ['BDT', 'SAR'];
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isValidOptionalAccountId(data) {
+      return !('accountId' in data) || (data.accountId is string && data.accountId.size() >= 1 && data.accountId.size() <= 128);
+    }
+
+    // --- ENTITY VALIDATION HELPERS ---
+
+    function isValidUserSettings(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120)) &&
+             data.sarToBdtRate is number &&
+             data.sarToBdtRate > 0 &&
+             data.sarToBdtRate <= 10000 &&
+             isValidCurrency(data.preferredCurrency) &&
+             data.language is string &&
+             data.language in ['BN', 'EN'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidManagedUser(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.loginId is string &&
+             data.loginId.size() >= 3 &&
+             data.loginId.size() <= 30 &&
+             data.loginId.matches('^[a-zA-Z0-9_.\\-]+$') &&
+             data.fullName is string &&
+             data.fullName.size() >= 1 &&
+             data.fullName.size() <= 100 &&
+             data.passwordHash is string &&
+             data.passwordHash.size() == 64 &&
+             data.role is string &&
+             data.role in ['ADMIN', 'USER'] &&
+             data.isActive is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidIncome(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             isValidOptionalAccountId(data) &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             isValidCurrency(data.currency) &&
+             data.source is string &&
+             data.source in ['SALARY', 'BUSINESS', 'OTHER'] &&
+             data.dateMillis is int &&
+             data.dateMillis >= 0 &&
+             data.description is string &&
+             data.description.size() <= 500 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidExpense(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             isValidOptionalAccountId(data) &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             isValidCurrency(data.currency) &&
+             data.category is string &&
+             data.category in [
+               'FOOD', 'RENT', 'ELECTRICITY', 'GAS', 'GROCERIES',
+               'TRANSPORT', 'MEDICAL', 'FAMILY', 'MOBILE_INTERNET', 'OTHER'
+             ] &&
+             data.dateMillis is int &&
+             data.dateMillis >= 0 &&
+             data.description is string &&
+             data.description.size() <= 500 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSavingsGoal(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             isValidOptionalAccountId(data) &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 100 &&
+             data.targetAmount is number &&
+             data.targetAmount > 0 &&
+             data.targetAmount <= 1000000000 &&
+             data.savedAmount is number &&
+             data.savedAmount >= 0 &&
+             data.savedAmount <= 1000000000 &&
+             isValidCurrency(data.currency) &&
+             data.frequency is string &&
+             data.frequency in ['DAILY', 'MONTHLY'] &&
+             data.targetDateMillis is int &&
+             data.targetDateMillis >= 0 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSavingsEntry(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             isValidOptionalAccountId(data) &&
+             data.goalId is string &&
+             data.goalId.size() <= 128 &&
+             data.goalTitle is string &&
+             data.goalTitle.size() <= 100 &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             isValidCurrency(data.currency) &&
+             data.frequency is string &&
+             data.frequency in ['DAILY', 'MONTHLY'] &&
+             data.dateMillis is int &&
+             data.dateMillis >= 0 &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidOptionalPersonPhone(data) {
+      return !('personPhone' in data) || (data.personPhone is string && data.personPhone.size() <= 40);
+    }
+
+    function isValidLoan(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             isValidOptionalAccountId(data) &&
+             data.type is string &&
+             data.type in ['LENT', 'BORROWED'] &&
+             data.personName is string &&
+             data.personName.size() >= 1 &&
+             data.personName.size() <= 100 &&
+             isValidOptionalPersonPhone(data) &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             data.paidAmount is number &&
+             data.paidAmount >= 0 &&
+             data.paidAmount <= data.amount &&
+             isValidCurrency(data.currency) &&
+             data.dateMillis is int &&
+             data.dateMillis >= 0 &&
+             data.dueDateMillis is int &&
+             data.dueDateMillis >= 0 &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             data.status is string &&
+             data.status in ['PENDING', 'PARTIAL', 'SETTLED'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidLoanRepayment(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             isValidOptionalAccountId(data) &&
+             data.loanId is string &&
+             data.loanId.size() <= 128 &&
+             data.loanType is string &&
+             data.loanType in ['LENT', 'BORROWED'] &&
+             data.personName is string &&
+             data.personName.size() >= 1 &&
+             data.personName.size() <= 100 &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             isValidCurrency(data.currency) &&
+             data.dateMillis is int &&
+             data.dateMillis >= 0 &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // --- COLLECTION RULES ---
+
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list, create, update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if (isOwner(userId) || isAdmin()) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll(['userId', 'sarToBdtRate', 'preferredCurrency', 'language', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'sarToBdtRate', 'preferredCurrency', 'language', 'createdAt', 'updatedAt']) &&
+                       isValidUserSettings(incoming(), userId);
+
+      allow update: if (isOwner(userId) || isAdmin()) &&
+                       isValidId(userId) &&
+                       isValidUserSettings(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'sarToBdtRate', 'preferredCurrency', 'language', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /managed_users/{managedUserId} {
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(managedUserId);
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if (isOwner(userId) || isAdmin()) &&
+                         isValidId(managedUserId) &&
+                         incoming().keys().hasAll(['userId', 'loginId', 'fullName', 'passwordHash', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'loginId', 'fullName', 'passwordHash', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
+                         isValidManagedUser(incoming(), userId);
+
+        allow update: if (isOwner(userId) || isAdmin()) &&
+                         isValidId(managedUserId) &&
+                         isValidManagedUser(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['loginId', 'fullName', 'passwordHash', 'role', 'isActive', 'updatedAt']);
+
+        allow delete: if (isOwner(userId) || isAdmin()) && isValidId(managedUserId);
+      }
+
+      match /incomes/{incomeId} {
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(incomeId);
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) &&
+                         isValidId(incomeId) &&
+                         incoming().keys().hasAll(['userId', 'amount', 'currency', 'source', 'dateMillis', 'description', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'accountId', 'amount', 'currency', 'source', 'dateMillis', 'description', 'createdAt', 'updatedAt']) &&
+                         isValidIncome(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(incomeId) &&
+                         isValidIncome(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['accountId', 'amount', 'currency', 'source', 'dateMillis', 'description', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(incomeId);
+      }
+
+      match /expenses/{expenseId} {
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(expenseId);
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) &&
+                         isValidId(expenseId) &&
+                         incoming().keys().hasAll(['userId', 'amount', 'currency', 'category', 'dateMillis', 'description', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'accountId', 'amount', 'currency', 'category', 'dateMillis', 'description', 'createdAt', 'updatedAt']) &&
+                         isValidExpense(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(expenseId) &&
+                         isValidExpense(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['accountId', 'amount', 'currency', 'category', 'dateMillis', 'description', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(expenseId);
+      }
+
+      match /savings_goals/{goalId} {
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(goalId);
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) &&
+                         isValidId(goalId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'targetAmount', 'savedAmount', 'currency', 'frequency', 'targetDateMillis', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'accountId', 'title', 'targetAmount', 'savedAmount', 'currency', 'frequency', 'targetDateMillis', 'createdAt', 'updatedAt']) &&
+                         isValidSavingsGoal(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(goalId) &&
+                         isValidSavingsGoal(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['accountId', 'title', 'targetAmount', 'savedAmount', 'currency', 'frequency', 'targetDateMillis', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(goalId);
+      }
+
+      match /savings_entries/{entryId} {
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(entryId);
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) &&
+                         isValidId(entryId) &&
+                         incoming().keys().hasAll(['userId', 'goalId', 'goalTitle', 'amount', 'currency', 'frequency', 'dateMillis', 'note', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'accountId', 'goalId', 'goalTitle', 'amount', 'currency', 'frequency', 'dateMillis', 'note', 'createdAt', 'updatedAt']) &&
+                         isValidSavingsEntry(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(entryId) &&
+                         isValidSavingsEntry(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['accountId', 'goalId', 'goalTitle', 'amount', 'currency', 'frequency', 'dateMillis', 'note', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(entryId);
+      }
+
+      match /loans/{loanId} {
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(loanId);
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) &&
+                         isValidId(loanId) &&
+                         incoming().keys().hasAll(['userId', 'type', 'personName', 'amount', 'paidAmount', 'currency', 'dateMillis', 'dueDateMillis', 'note', 'status', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'accountId', 'type', 'personName', 'personPhone', 'amount', 'paidAmount', 'currency', 'dateMillis', 'dueDateMillis', 'note', 'status', 'createdAt', 'updatedAt']) &&
+                         isValidLoan(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(loanId) &&
+                         isValidLoan(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['accountId', 'type', 'personName', 'personPhone', 'amount', 'paidAmount', 'currency', 'dateMillis', 'dueDateMillis', 'note', 'status', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(loanId);
+      }
+
+      match /loan_repayments/{repaymentId} {
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(repaymentId);
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) &&
+                         isValidId(repaymentId) &&
+                         incoming().keys().hasAll(['userId', 'loanId', 'loanType', 'personName', 'amount', 'currency', 'dateMillis', 'note', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'accountId', 'loanId', 'loanType', 'personName', 'amount', 'currency', 'dateMillis', 'note', 'createdAt', 'updatedAt']) &&
+                         isValidLoanRepayment(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(repaymentId) &&
+                         isValidLoanRepayment(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['accountId', 'loanId', 'loanType', 'personName', 'amount', 'currency', 'dateMillis', 'note', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(repaymentId);
+      }
+    }
+  }
+}

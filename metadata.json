@@ -1,0 +1,6 @@
+{
+  "name": "আমার হিসাব",
+  "description": "Personal finance manager app (My Hisab) in Bengali & English with income, expense, savings, loans, BDT/SAR dual currency, reports, and cloud sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

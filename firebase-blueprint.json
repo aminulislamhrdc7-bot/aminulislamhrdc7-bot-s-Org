@@ -1,0 +1,195 @@
+{
+  "entities": {
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User profile and currency/localization preferences for My Hisab.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "displayName": { "type": "string", "description": "User display name." },
+        "sarToBdtRate": { "type": "number", "description": "Exchange rate from 1 SAR to BDT." },
+        "preferredCurrency": { "type": "string", "enum": ["BDT", "SAR"] },
+        "language": { "type": "string", "enum": ["BN", "EN"] },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "sarToBdtRate", "preferredCurrency", "language", "createdAt", "updatedAt"]
+    },
+    "ManagedUser": {
+      "title": "ManagedUser",
+      "description": "Admin-created user account with User ID and hashed password for workspace login.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "loginId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "passwordHash": { "type": "string" },
+        "role": { "type": "string", "enum": ["ADMIN", "USER"] },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "loginId", "fullName", "passwordHash", "role", "isActive", "createdAt", "updatedAt"]
+    },
+    "IncomeEntry": {
+      "title": "IncomeEntry",
+      "description": "An income record belonging to a user account.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["BDT", "SAR"] },
+        "source": { "type": "string", "enum": ["SALARY", "BUSINESS", "OTHER"] },
+        "dateMillis": { "type": "integer" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "currency", "source", "dateMillis", "description", "createdAt", "updatedAt"]
+    },
+    "ExpenseEntry": {
+      "title": "ExpenseEntry",
+      "description": "An expense record belonging to a user account.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["BDT", "SAR"] },
+        "category": {
+          "type": "string",
+          "enum": [
+            "FOOD",
+            "RENT",
+            "ELECTRICITY",
+            "GAS",
+            "GROCERIES",
+            "TRANSPORT",
+            "MEDICAL",
+            "FAMILY",
+            "MOBILE_INTERNET",
+            "OTHER"
+          ]
+        },
+        "dateMillis": { "type": "integer" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "currency", "category", "dateMillis", "description", "createdAt", "updatedAt"]
+    },
+    "SavingsGoal": {
+      "title": "SavingsGoal",
+      "description": "A user savings goal with target and progress tracking.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "title": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "savedAmount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["BDT", "SAR"] },
+        "frequency": { "type": "string", "enum": ["DAILY", "MONTHLY"] },
+        "targetDateMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "targetAmount", "savedAmount", "currency", "frequency", "targetDateMillis", "createdAt", "updatedAt"]
+    },
+    "SavingsEntry": {
+      "title": "SavingsEntry",
+      "description": "A daily or monthly savings deposit record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "goalId": { "type": "string" },
+        "goalTitle": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["BDT", "SAR"] },
+        "frequency": { "type": "string", "enum": ["DAILY", "MONTHLY"] },
+        "dateMillis": { "type": "integer" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "goalId", "goalTitle", "amount", "currency", "frequency", "dateMillis", "note", "createdAt", "updatedAt"]
+    },
+    "LoanRecord": {
+      "title": "LoanRecord",
+      "description": "A money lent or borrowed record with repayment tracking.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "type": { "type": "string", "enum": ["LENT", "BORROWED"] },
+        "personName": { "type": "string" },
+        "personPhone": { "type": "string" },
+        "amount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["BDT", "SAR"] },
+        "dateMillis": { "type": "integer" },
+        "dueDateMillis": { "type": "integer" },
+        "note": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "PARTIAL", "SETTLED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "personName", "amount", "paidAmount", "currency", "dateMillis", "dueDateMillis", "note", "status", "createdAt", "updatedAt"]
+    },
+    "LoanRepayment": {
+      "title": "LoanRepayment",
+      "description": "A dated loan repayment or collection entry linked to a LoanRecord.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "loanId": { "type": "string" },
+        "loanType": { "type": "string", "enum": ["LENT", "BORROWED"] },
+        "personName": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["BDT", "SAR"] },
+        "dateMillis": { "type": "integer" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "loanId", "loanType", "personName", "amount", "currency", "dateMillis", "note", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "User profile and currency/language settings."
+    },
+    "/users/{userId}/managed_users/{managedUserId}": {
+      "schema": { "$ref": "#/entities/ManagedUser" },
+      "description": "Admin-created User IDs and hashed passwords for workspace login."
+    },
+    "/users/{userId}/incomes/{incomeId}": {
+      "schema": { "$ref": "#/entities/IncomeEntry" },
+      "description": "User income records."
+    },
+    "/users/{userId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/ExpenseEntry" },
+      "description": "User expense records."
+    },
+    "/users/{userId}/savings_goals/{goalId}": {
+      "schema": { "$ref": "#/entities/SavingsGoal" },
+      "description": "User savings goals."
+    },
+    "/users/{userId}/savings_entries/{entryId}": {
+      "schema": { "$ref": "#/entities/SavingsEntry" },
+      "description": "User daily and monthly savings contributions."
+    },
+    "/users/{userId}/loans/{loanId}": {
+      "schema": { "$ref": "#/entities/LoanRecord" },
+      "description": "User lent and borrowed loan records."
+    },
+    "/users/{userId}/loan_repayments/{repaymentId}": {
+      "schema": { "$ref": "#/entities/LoanRepayment" },
+      "description": "Dated loan repayment and recovery entries."
+    }
+  }
+}
